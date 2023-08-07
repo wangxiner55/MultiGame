@@ -4,33 +4,45 @@
 #include "PlayerAnimInstance.h"
 #include "../Debug/DebugUtility.h"
 #include "PlayerCharacterBase.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 void UPlayerAnimInstance::NativeBeginPlay()
 {
 	Super::NativeBeginPlay();
 	Owner = TryGetPawnOwner();
-	playerInterface = Cast<APlayerCharacterBase>(Owner);
+	
+	Character = Cast<ACharacter>(Owner);
+	playerInterface = Cast<ICharacterInfoInterface>(Character);
+
+	
+	
 }
 
 void UPlayerAnimInstance::NativeInitializeAnimation()
 {
-
-
+	CharacterMovement = Character->GetCharacterMovement();
+	LeanAmount = FVector2D(0.0f);
+	LeanInterpSpeed = 4.0f;
 }
 
 void UPlayerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
+	DeltaT = DeltaSeconds;
+	UpdatePlayerBaseInfo();
 
-	GetPlayerCharacterInfo();
-	GetPlayerCharacterState();
-	SetAnimState();
-	SetAnimValue();
-
-
+	UpdateMovementValue();
 
 }
 
+void UPlayerAnimInstance::UpdatePlayerBaseInfo()
+{
+	GetPlayerCharacterInfo();
+	GetPlayerCharacterState();
+	SetAnimPlayerBaseState();
+	SetAnimPlayerBaseValue();
 
+}
 
 void UPlayerAnimInstance::GetPlayerCharacterInfo()
 {
@@ -46,7 +58,7 @@ void UPlayerAnimInstance::GetPlayerCharacterState()
 	CharacterState = playerInterface->GetCharacterState();
 }
 
-void UPlayerAnimInstance::SetAnimValue()
+void UPlayerAnimInstance::SetAnimPlayerBaseValue()
 {
 	Velocity				=		CharacterData.Velocity;
 	Speed					=		CharacterData.Speed;
@@ -62,7 +74,7 @@ void UPlayerAnimInstance::SetAnimValue()
 
 }
 
-void UPlayerAnimInstance::SetAnimState()
+void UPlayerAnimInstance::SetAnimPlayerBaseState()
 {
 	MovementState			 =			CharacterState.MovementState;
 	Stance					 =			CharacterState.Stance;
@@ -71,3 +83,38 @@ void UPlayerAnimInstance::SetAnimState()
 }
 
 
+
+void UPlayerAnimInstance::UpdateMovementValue()
+{
+	FVector AccAmount = CalculateRelativeAccelerationAmount();
+	FVector2D TargetLeanAmount = FVector2D(AccAmount.Y, AccAmount.X);
+	LeanAmount = InterpLeanAmount(LeanAmount, TargetLeanAmount, LeanInterpSpeed, DeltaT);
+}
+
+FVector UPlayerAnimInstance::CalculateRelativeAccelerationAmount()
+{
+	bool bIsSameless = UKismetMathLibrary::Dot_VectorVector(Acceleration, Velocity) > 0.0f ? true : false;
+	if (bIsSameless)
+	{
+		float MaxAcc = CharacterMovement->GetMaxAcceleration();
+		return UKismetMathLibrary::LessLess_VectorRotator(
+			UKismetMathLibrary::Vector_ClampSizeMax(Acceleration, MaxAcc) / MaxAcc,
+			Character->GetActorRotation());
+	}
+	else
+	{
+		float MaxAcc = CharacterMovement->GetMaxBrakingDeceleration();
+		return UKismetMathLibrary::LessLess_VectorRotator(
+			UKismetMathLibrary::Vector_ClampSizeMax(Acceleration, MaxAcc) / MaxAcc,
+			Character->GetActorRotation());
+	}
+}
+
+
+
+FVector2D UPlayerAnimInstance::InterpLeanAmount(FVector2D Current, FVector2D Target, float InterpSpeed, float DeltaTime)
+{
+	return FVector2D(
+		UKismetMathLibrary::FInterpTo(Current.X, Target.X, DeltaTime, InterpSpeed),
+		UKismetMathLibrary::FInterpTo(Current.Y, Target.Y, DeltaTime, InterpSpeed));
+}

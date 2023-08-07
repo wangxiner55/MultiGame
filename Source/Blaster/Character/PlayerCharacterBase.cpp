@@ -39,7 +39,7 @@ APlayerCharacterBase::APlayerCharacterBase()
 	Combat->SetIsReplicated(true);
 	
 	
-
+	
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 	WeaponInterface = OverlapWeapon;
 }
@@ -50,7 +50,7 @@ APlayerCharacterBase::APlayerCharacterBase()
 void APlayerCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	CharacterMovement = GetCharacterMovement();
 	
 	
 	InitCharacterBaseInfo();
@@ -326,6 +326,7 @@ FCharacterData APlayerCharacterBase::GetCharacterInfo()
 {
 	FCharacterData data;
 
+	data.Acceleration			 =				CurAcceleration;
 	data.Velocity				 =				CurVelocity;
 	data.AimingRotation			 =				AimRotation;
 	data.MovementInput			 =				GetCharacterMovement()->GetCurrentAcceleration();
@@ -335,7 +336,6 @@ FCharacterData APlayerCharacterBase::GetCharacterInfo()
 	data.bIsEquipedWeapon		 =				IsCharacterWeaponEquiped();
 	data.bIsAiming				 =				IsAimingState();
 
-	data.Acceleration			 =				CurAcceleration;
 	data.AimYawRate				 =				AimYawRate;
 	data.Speed					 =				CurSpeed;
 	data.MovementInputAmount	 =				MovementInputAmount;

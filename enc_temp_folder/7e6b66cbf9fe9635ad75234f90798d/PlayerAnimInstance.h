@@ -7,7 +7,6 @@
 #include "../Interfaces/CharacterInfoInterface.h"
 #include "PlayerAnimInstance.generated.h"
 
-
 /**
  * 
  */
@@ -96,25 +95,9 @@ private:
 	ICharacterInfoInterface* playerInterface; 
 	
 private:
-	
-	// Update Data from CharacterBP
-	void UpdatePlayerBaseInfo();
-	void SetAnimPlayerBaseValue();
-	void SetAnimPlayerBaseState();
-	FVector2D InterpLeanAmount(FVector2D Current, FVector2D Target, float InterpSpeed, float DeltaTime);
+	void SetAnimValue();
+	void SetAnimState();
 
-	void UpdateMovementValue();
-	FVector CalculateRelativeAccelerationAmount();
-
-
-
-private:
-
-	float DeltaT;
-	float LeanInterpSpeed;
-	FVector2D LeanAmount;
-	ACharacter* Character;
-	class UCharacterMovementComponent* CharacterMovement;
 };
 
 
