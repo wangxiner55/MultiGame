@@ -211,7 +211,7 @@ void APlayerCharacterBase::CharacterBaseInfo()
 
 	
 	CurVelocity				= GetVelocity();
-	LastVelocityRotation	= UKismetMathLibrary::Conv_VectorToRotator(CurVelocity);
+	LastVelocityRotation	= UKismetMathLibrary::MakeRotFromX(CurVelocity);
 	
 	CurLocation				= GetActorLocation();
 	CurRotator				= GetActorRotation();
@@ -223,7 +223,8 @@ void APlayerCharacterBase::CharacterBaseInfo()
 							
 	AimYawRate				= (CurAimYaw - PreAimYaw) / DeltaT;
 	MovementInputAmount		= CharacterMovement->GetCurrentAcceleration().Length() / CharacterMovement->GetMaxAcceleration();
-	LastMovementRotation	= CharacterMovement->GetCurrentAcceleration().ToOrientationRotator();
+	LastMovementRotation	= UKismetMathLibrary::MakeRotFromX(CharacterMovement->GetCurrentAcceleration());
+	bHasMovementInput		= MovementInputAmount > 0.0 ? true : false;
 							
 	
 
@@ -329,15 +330,15 @@ FCharacterData APlayerCharacterBase::GetCharacterInfo()
 	data.AimingRotation			 =				AimRotation;
 	data.MovementInput			 =				GetCharacterMovement()->GetCurrentAcceleration();
 
-	data.bHasMovementInput		 =				false;
-	data.bIsMoving				 =				false;
+	data.bHasMovementInput		 =				bHasMovementInput;
+	data.bIsMoving				 =				bIsMoving;
 	data.bIsEquipedWeapon		 =				IsCharacterWeaponEquiped();
 	data.bIsAiming				 =				IsAimingState();
 
-	data.Acceleration			 =				FVector(0.0f);
+	data.Acceleration			 =				CurAcceleration;
 	data.AimYawRate				 =				AimYawRate;
 	data.Speed					 =				CurSpeed;
-	data.MovementInputAmount	 =				0.0f;
+	data.MovementInputAmount	 =				MovementInputAmount;
 
 	return data;
 }

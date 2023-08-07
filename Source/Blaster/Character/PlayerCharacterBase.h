@@ -117,6 +117,7 @@ private:
 	float		DeltaT;
 	float		MovementInputAmount;
 	bool		bIsMoving;
+	bool		bHasMovementInput;
 	FRotator	LastVelocityRotation;
 	FRotator	LastMovementRotation;
 
