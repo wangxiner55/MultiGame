@@ -35,7 +35,7 @@ public:
 
 	virtual FCharacterData GetCharacterInfo() = 0;
 	virtual FCharacterState GetCharacterState() = 0;
-	virtual bool GetCharacterEquipState() = 0;
+	virtual bool IsCharacterWeaponEquiped() = 0;
 
 
 	virtual void SetMovementState(const enum EMovementState& state) = 0;

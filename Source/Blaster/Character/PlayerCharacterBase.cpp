@@ -11,6 +11,7 @@
 #include "../Weapon/PlayerWeapon.h"
 #include "../BlasterComponents/PlayerCombatComponent.h"
 #include "../Interfaces/WeaponInterface.h"
+#include "Kismet/KismetMathLibrary.h"
 
 // Sets default values
 APlayerCharacterBase::APlayerCharacterBase()
@@ -36,7 +37,8 @@ APlayerCharacterBase::APlayerCharacterBase()
 
 	Combat = CreateDefaultSubobject<UPlayerCombatComponent>(TEXT("CombatComponent"));
 	Combat->SetIsReplicated(true);
-
+	
+	
 
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 	WeaponInterface = OverlapWeapon;
@@ -49,13 +51,24 @@ void APlayerCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	
+	
+	InitCharacterBaseInfo();
+	
+
 }
 
 
 void APlayerCharacterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	//SetTickTime
+	DeltaT = DeltaTime;
+	
+	UpdateCharacterBaseInfo();
 
+
+	SaveCharacterBaseInfo();
 }
 
 
@@ -151,12 +164,12 @@ void APlayerCharacterBase::OnCrouchButtonPressed()
 
 void APlayerCharacterBase::OnAimButtonPressed()
 {
-	if (Combat) Combat->bisAiming = true;
+	if (Combat) Combat->SetAiming(true);
 }
 
 void APlayerCharacterBase::OnAimButtonReleased()
 {
-	if (Combat) Combat->bisAiming = false;
+	if (Combat) Combat->SetAiming(false);
 }
 
 void APlayerCharacterBase::ServerOnEquipButtonPressed_Implementation()
@@ -182,6 +195,65 @@ void APlayerCharacterBase::OnRep_OverlappingWeapon(APlayerWeapon* LastWeapon)
 }
 
 
+void APlayerCharacterBase::InitCharacterBaseInfo()
+{
+	CurSpeed	 = 0.0f;
+	AimYawRate	 = 0.0f;
+	CurAimYaw	 = GetControlRotation().Yaw;
+	PreAimYaw	 = CurAimYaw;
+	UpdateCharacterBaseInfo();
+	SaveCharacterBaseInfo();
+}
+
+void APlayerCharacterBase::CharacterBaseInfo()
+{
+	CurAcceleration			= GetAcceleration();
+
+	
+	CurVelocity				= GetVelocity();
+	LastVelocityRotation	= UKismetMathLibrary::Conv_VectorToRotator(CurVelocity);
+	
+	CurLocation				= GetActorLocation();
+	CurRotator				= GetActorRotation();
+							
+	CurSpeed				= FVector2D(CurVelocity.X, CurVelocity.Y).Length();
+	bIsMoving				= CurSpeed > 1.0 ? true : false;
+							
+	AimRotation				= GetBaseAimRotation();
+							
+	AimYawRate				= (CurAimYaw - PreAimYaw) / DeltaT;
+	MovementInputAmount		= CharacterMovement->GetCurrentAcceleration().Length() / CharacterMovement->GetMaxAcceleration();
+	LastMovementRotation	= CharacterMovement->GetCurrentAcceleration().ToOrientationRotator();
+							
+	
+
+
+}
+
+void APlayerCharacterBase::UpdateCharacterBaseInfo()
+{
+
+
+	CharacterBaseInfo();
+	
+
+	//Update AimYawOffset
+	FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(CurVelocity);
+	AimYawRate = UKismetMathLibrary::NormalizedDeltaRotator(MovementRotation, AimRotation).Yaw;
+	
+	FRotator DeltaRotator = UKismetMathLibrary::NormalizedDeltaRotator(PreRotator, CurRotator);
+
+}
+
+void APlayerCharacterBase::SaveCharacterBaseInfo()
+{
+	PreAcceleration = CurAcceleration;
+	PreVelocity		= CurVelocity;
+	PreLocation		= CurLocation;
+	PreRotator		= CurRotator;
+	PreSpeed		= CurSpeed;
+	PreAimYaw		= CurAimYaw;
+}
 
 void APlayerCharacterBase::SetOverlappingWeapon(APlayerWeapon* PlayerWeapon)
 {
@@ -198,6 +270,11 @@ bool APlayerCharacterBase::IsAimingState()
 	return (Combat && Combat->bisAiming);
 }
 
+FVector APlayerCharacterBase::GetAcceleration()
+{
+	return (CurVelocity - PreVelocity) / DeltaT;
+}
+
 void APlayerCharacterBase::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -206,9 +283,6 @@ void APlayerCharacterBase::PostInitializeComponents()
 		Combat->Character = this;
 	}
 }
-
-
-
 
 void APlayerCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PrevCustomMode)
 {
@@ -251,19 +325,19 @@ FCharacterData APlayerCharacterBase::GetCharacterInfo()
 {
 	FCharacterData data;
 
-	data.Velocity = GetVelocity();
-	data.AimingRotation = GetControlRotation();
-	data.MovementInput = GetCharacterMovement()->GetCurrentAcceleration();
+	data.Velocity				 =				CurVelocity;
+	data.AimingRotation			 =				AimRotation;
+	data.MovementInput			 =				GetCharacterMovement()->GetCurrentAcceleration();
 
-	data.bHasMovementInput = false;
-	data.bIsMoving = false;
-	data.bIsEquipedWeapon = GetCharacterEquipState();
-	data.bIsAiming = IsAimingState();
+	data.bHasMovementInput		 =				false;
+	data.bIsMoving				 =				false;
+	data.bIsEquipedWeapon		 =				IsCharacterWeaponEquiped();
+	data.bIsAiming				 =				IsAimingState();
 
-	data.Acceleration = FVector(0.0f);
-	data.AimYawRate = 0.0f;
-	data.Speed = 0.0f;
-	data.MovementInputAmount = 0.0f;
+	data.Acceleration			 =				FVector(0.0f);
+	data.AimYawRate				 =				AimYawRate;
+	data.Speed					 =				CurSpeed;
+	data.MovementInputAmount	 =				0.0f;
 
 	return data;
 }
@@ -276,7 +350,7 @@ FCharacterState APlayerCharacterBase::GetCharacterState()
 	return state;
 }
 
-bool APlayerCharacterBase::GetCharacterEquipState()
+bool APlayerCharacterBase::IsCharacterWeaponEquiped()
 {
 	return (Combat && Combat->EquippedWeapon);
 }

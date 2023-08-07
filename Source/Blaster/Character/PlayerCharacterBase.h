@@ -24,7 +24,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PrevCustomMode) override;
 	virtual void PostInitializeComponents() override;
-
+	
 
 public:
 
@@ -36,11 +36,27 @@ public:
 
 	virtual FCharacterData GetCharacterInfo() override;
 	virtual FCharacterState GetCharacterState() override;
-	virtual bool GetCharacterEquipState() override;
+	virtual bool IsCharacterWeaponEquiped() override;
 	
 
 protected:
 	virtual void BeginPlay() override;
+
+	UFUNCTION()
+	void InitCharacterBaseInfo();
+
+	UFUNCTION()
+	void UpdateCharacterBaseInfo();
+
+	UFUNCTION()
+	void CharacterBaseInfo();
+
+	UFUNCTION()
+	void SaveCharacterBaseInfo();
+
+
+
+
 
 
 	void MoveForward(float Value);
@@ -78,10 +94,14 @@ private:
 	UFUNCTION(Server, Reliable)
 		void ServerOnEquipButtonPressed();
 
+
+	
+
 public:
 
 	void SetOverlappingWeapon(APlayerWeapon* PlayerWeapon);
 	bool IsAimingState();
+	FVector GetAcceleration();
 
 
 
@@ -92,4 +112,31 @@ private:
 	EStance Stance;
 	EOverlayState OverlayState;
 
+private:
+
+	float		DeltaT;
+	float		MovementInputAmount;
+	bool		bIsMoving;
+	FRotator	LastVelocityRotation;
+	FRotator	LastMovementRotation;
+
+	FRotator	AimRotation;
+	float		AimYawRate;
+	float		PreAimYaw;
+	float		CurAimYaw;
+
+	float		CurSpeed;
+	FVector		CurAcceleration;
+	FVector		CurVelocity;
+	FVector		CurLocation;
+	FRotator	CurRotator;
+
+	float		PreSpeed;
+	FVector		PreAcceleration;
+	FVector		PreVelocity;
+	FVector		PreLocation;
+	FRotator	PreRotator;
+
+
+	UCharacterMovementComponent* CharacterMovement;
 };
