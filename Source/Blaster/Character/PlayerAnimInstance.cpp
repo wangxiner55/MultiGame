@@ -6,32 +6,50 @@
 #include "PlayerCharacterBase.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/Actor.h"
 
 void UPlayerAnimInstance::NativeBeginPlay()
 {
 	Super::NativeBeginPlay();
-	Owner = TryGetPawnOwner();
 	
-	Character = Cast<ACharacter>(Owner);
-	playerInterface = Cast<ICharacterInfoInterface>(Character);
-
+	
+	
+	LeanAmount = FVector2D(0.0f);
+	LeanInterpSpeed = 4.0f;
 	
 	
 }
 
 void UPlayerAnimInstance::NativeInitializeAnimation()
 {
+	Owner = TryGetPawnOwner();
+	if (Owner == nullptr) return;
+	Character = Cast<ACharacter>(Owner);
+	playerInterface = Cast<ICharacterInfoInterface>(Character);
+
+	//考虑从角色传入，这个在角色部分已经实现过
 	CharacterMovement = Character->GetCharacterMovement();
-	LeanAmount = FVector2D(0.0f);
-	LeanInterpSpeed = 4.0f;
+	ControlRotation = Character->GetControlRotation();
+	
 }
 
 void UPlayerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	DeltaT = DeltaSeconds;
-	UpdatePlayerBaseInfo();
 
-	UpdateMovementValue();
+	// Check  Character ptr
+	if(Character == nullptr)
+	Character = Cast<ACharacter>(TryGetPawnOwner());
+	if (Character == nullptr) return;
+
+
+	UpdatePlayerBaseInfo();
+	
+	if (MoveCheck())
+	{
+		UpdateMovementValue();
+	}
+	//
 
 }
 
@@ -41,6 +59,7 @@ void UPlayerAnimInstance::UpdatePlayerBaseInfo()
 	GetPlayerCharacterState();
 	SetAnimPlayerBaseState();
 	SetAnimPlayerBaseValue();
+	
 
 }
 
@@ -80,9 +99,13 @@ void UPlayerAnimInstance::SetAnimPlayerBaseState()
 	Stance					 =			CharacterState.Stance;
 	OverlayState			 =			CharacterState.OverlayState;
 	Gait					 =			CharacterState.Gait;
+	RotationMode			 =			CharacterState.RotationMode;
 }
 
-
+bool UPlayerAnimInstance::MoveCheck()
+{
+	return IsMoving && HasMovementInput || Speed > 150.0f;
+}
 
 void UPlayerAnimInstance::UpdateMovementValue()
 {
@@ -93,7 +116,8 @@ void UPlayerAnimInstance::UpdateMovementValue()
 
 FVector UPlayerAnimInstance::CalculateRelativeAccelerationAmount()
 {
-	bool bIsSameless = UKismetMathLibrary::Dot_VectorVector(Acceleration, Velocity) > 0.0f ? true : false;
+
+	bool bIsSameless = Acceleration.Dot(Velocity) > 0.0f ? true : false;
 	if (bIsSameless)
 	{
 		float MaxAcc = CharacterMovement->GetMaxAcceleration();
@@ -110,11 +134,29 @@ FVector UPlayerAnimInstance::CalculateRelativeAccelerationAmount()
 	}
 }
 
-
-
 FVector2D UPlayerAnimInstance::InterpLeanAmount(FVector2D Current, FVector2D Target, float InterpSpeed, float DeltaTime)
 {
 	return FVector2D(
 		UKismetMathLibrary::FInterpTo(Current.X, Target.X, DeltaTime, InterpSpeed),
 		UKismetMathLibrary::FInterpTo(Current.Y, Target.Y, DeltaTime, InterpSpeed));
+}
+
+void UPlayerAnimInstance::SetVelocityBlend()
+{
+	FVector4 TargetVelocityBlend = CalcVelocityBlend();
+	
+
+	VelocityBlend = FVector4(
+		UKismetMathLibrary::FInterpTo(VelocityBlend.X, TargetVelocityBlend.X, DeltaT, VelocityBlendInterpSpeed),
+		UKismetMathLibrary::FInterpTo(VelocityBlend.Y, TargetVelocityBlend.Y, DeltaT, VelocityBlendInterpSpeed),
+		UKismetMathLibrary::FInterpTo(VelocityBlend.Z, TargetVelocityBlend.Z, DeltaT, VelocityBlendInterpSpeed),
+		UKismetMathLibrary::FInterpTo(VelocityBlend.W, TargetVelocityBlend.W, DeltaT, VelocityBlendInterpSpeed));
+}
+
+
+FVector4 UPlayerAnimInstance::CalcVelocityBlend()
+{
+	FVector RelativeVelocity = Character->GetActorRotation().UnrotateVector(Velocity.GetSafeNormal());
+	FVector RelVel = RelativeVelocity / (RelativeVelocity.X + RelativeVelocity.Y + RelativeVelocity.Z);
+	return FVector4(RelVel.X, abs((RelVel.X)), RelVel.Y, abs((RelVel.Y)));
 }

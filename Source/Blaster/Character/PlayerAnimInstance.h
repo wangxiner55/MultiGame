@@ -75,46 +75,58 @@ private:
 	EPlayerWeaponState WeaponState;
 
 	UPROPERTY(BlueprintReadOnly, Category = Character, meta = (AllowPrivateAccess = "true"))
+	ERotationMode RotationMode;
+
+	UPROPERTY(BlueprintReadOnly, Category = Character, meta = (AllowPrivateAccess = "true"))
 	bool bIsEquipWeapon;
+
+	UPROPERTY(BlueprintReadOnly, Category = Character, meta = (AllowPrivateAccess = "true"))
+	FVector2D LeanAmount;
+
+	UPROPERTY(BlueprintReadOnly, Category = Character, meta = (AllowPrivateAccess = "true"))
+	FVector4 VelocityBlend;
+
+	
 
 
 private:
 	struct FCharacterData  CharacterData;
 	struct FCharacterState CharacterState;
 
-public:
-
-	void GetPlayerCharacterInfo();
-
-	void GetPlayerCharacterState();
-
-
 
 private:
 
 	APawn* Owner;
+	ACharacter* Character;
 	ICharacterInfoInterface* playerInterface; 
+	class UCharacterMovementComponent* CharacterMovement;
 	
 private:
 	
-	// Update Data from CharacterBP
+	// Update Base Data from CharacterBP
 	void UpdatePlayerBaseInfo();
+	void GetPlayerCharacterInfo();
+	void GetPlayerCharacterState();
 	void SetAnimPlayerBaseValue();
 	void SetAnimPlayerBaseState();
-	FVector2D InterpLeanAmount(FVector2D Current, FVector2D Target, float InterpSpeed, float DeltaTime);
 
+	//Calculate Move Data 
+	bool MoveCheck();
 	void UpdateMovementValue();
 	FVector CalculateRelativeAccelerationAmount();
+	FVector2D InterpLeanAmount(FVector2D Current, FVector2D Target, float InterpSpeed, float DeltaTime);
 
+	void SetVelocityBlend();
+	FVector4 CalcVelocityBlend();
 
 
 private:
 
 	float DeltaT;
+	float VelocityBlendInterpSpeed;
 	float LeanInterpSpeed;
-	FVector2D LeanAmount;
-	ACharacter* Character;
-	class UCharacterMovementComponent* CharacterMovement;
+	FRotator ControlRotation;
+
 };
 
 

@@ -42,6 +42,7 @@ public:
 	virtual void SetGaitState(const enum EGait& state) = 0;
 	virtual void SetStanceState(const enum EStance& state) = 0;
 	virtual void SetOverlayState(const enum EOverlayState& state) = 0;
+	virtual void SetRotationMode(const enum ERotationMode& state) = 0;
 
 };
 
@@ -62,6 +63,14 @@ enum class EGait : uint8
 	Walking UMETA(DisplayName = "Walking"),
 	Running UMETA(DisplayName = "Running"),
 	Sprinting UMETA(DisplayName = "Sprinting")
+};
+
+UENUM(BlueprintType)
+enum class ERotationMode : uint8
+{
+	VelocityDirection UMETA(DisplayName = "VelocityDirection"),
+	LookingDirection UMETA(DisplayName = "LookingDirection"),
+	Aiming UMETA(DisplayName = "Aiming")
 };
 
 UENUM(BlueprintType)
@@ -109,4 +118,5 @@ public:
 	EGait Gait;
 	EStance Stance;
 	EOverlayState OverlayState;
+	ERotationMode RotationMode;
 };

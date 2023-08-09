@@ -38,10 +38,12 @@ APlayerCharacterBase::APlayerCharacterBase()
 	Combat = CreateDefaultSubobject<UPlayerCombatComponent>(TEXT("CombatComponent"));
 	Combat->SetIsReplicated(true);
 	
-	
-	
+
+	CharacterMovement = GetCharacterMovement() == nullptr ? nullptr : GetCharacterMovement();
+	AnimInstance = this->GetMesh()->GetAnimInstance() == nullptr ? nullptr : this->GetMesh()->GetAnimInstance();
+	InitState();
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
-	WeaponInterface = OverlapWeapon;
+	//WeaponInterface = OverlapWeapon;
 }
 
 
@@ -50,14 +52,48 @@ APlayerCharacterBase::APlayerCharacterBase()
 void APlayerCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
-	CharacterMovement = GetCharacterMovement();
-	
-	
-	InitCharacterBaseInfo();
+
+	//ensure current Data update before with animInstance and Mesh
+	this->GetMesh()->AddTickPrerequisiteActor(this);
+
+
+	CharacterMovement	= GetCharacterMovement()				== nullptr ? nullptr : GetCharacterMovement();
+	AnimInstance		= this->GetMesh()->GetAnimInstance()	== nullptr ? nullptr : this->GetMesh()->GetAnimInstance();
 	
 
+	InitControllerData();
+	InitCharacterBaseInfo();
 }
 
+void APlayerCharacterBase::InitState()
+{
+	RotationMode = ERotationMode::VelocityDirection;
+	Gait = EGait::Walking;
+	Stance = EStance::Standing;
+	OverlayState = EOverlayState::Default;
+	MovementState = EMovementState::Grounded;
+	PreMovementState = EMovementState::Grounded;
+}
+
+
+void APlayerCharacterBase::InitControllerData()
+{
+	if (Controller == nullptr)return;
+	ControllerBaseCoreData();
+}
+
+
+
+//Character Base Info
+void APlayerCharacterBase::InitCharacterBaseInfo()
+{
+	
+	
+	LastMovementRotation = LastVelocityRotation = TargetRotation = GetActorRotation();
+
+	UpdateCharacterBaseInfo();
+	SaveCharacterAndControllerBaseInfo();
+}
 
 void APlayerCharacterBase::Tick(float DeltaTime)
 {
@@ -66,9 +102,10 @@ void APlayerCharacterBase::Tick(float DeltaTime)
 	DeltaT = DeltaTime;
 	
 	UpdateCharacterBaseInfo();
+	UpdateControllerBaseInfo();
 
 
-	SaveCharacterBaseInfo();
+	SaveCharacterAndControllerBaseInfo();
 }
 
 
@@ -90,6 +127,8 @@ void APlayerCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 	PlayerInputComponent->BindAction("Aim", EInputEvent::IE_Released, this, &APlayerCharacterBase::OnAimButtonReleased);
 }
 
+
+//Replicat RPC
 void APlayerCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -194,41 +233,31 @@ void APlayerCharacterBase::OnRep_OverlappingWeapon(APlayerWeapon* LastWeapon)
 	}
 }
 
-
-void APlayerCharacterBase::InitCharacterBaseInfo()
-{
-	CurSpeed	 = 0.0f;
-	AimYawRate	 = 0.0f;
-	CurAimYaw	 = GetControlRotation().Yaw;
-	PreAimYaw	 = CurAimYaw;
-	UpdateCharacterBaseInfo();
-	SaveCharacterBaseInfo();
-}
-
 void APlayerCharacterBase::CharacterBaseInfo()
 {
-	CurAcceleration			= GetAcceleration();
-
-	
-	CurVelocity				= GetVelocity();
-	LastVelocityRotation	= UKismetMathLibrary::MakeRotFromX(CurVelocity);
-	
-	CurLocation				= GetActorLocation();
-	CurRotator				= GetActorRotation();
-							
-	CurSpeed				= FVector2D(CurVelocity.X, CurVelocity.Y).Length();
-	bIsMoving				= CurSpeed > 1.0 ? true : false;
-							
-	AimRotation				= GetBaseAimRotation();
-							
-	AimYawRate				= (CurAimYaw - PreAimYaw) / DeltaT;
-	MovementInputAmount		= CharacterMovement->GetCurrentAcceleration().Length() / CharacterMovement->GetMaxAcceleration();
-	LastMovementRotation	= UKismetMathLibrary::MakeRotFromX(CharacterMovement->GetCurrentAcceleration());
-	bHasMovementInput		= MovementInputAmount > 0.0 ? true : false;
-							
 	
 
+	CurCharacterVelocity		= GetVelocity();
+	LastVelocityRotation		= UKismetMathLibrary::MakeRotFromX(CurCharacterVelocity);
+	
+	CurCharacterAcceleration = GetAcceleration();
 
+	CurCharacterLocation		= GetActorLocation();
+
+	CurCharacterRotator			= GetActorRotation(); 
+								
+	CurCharacterSpeed			= FVector2D(CurCharacterVelocity.X, CurCharacterVelocity.Y).Length();
+	bIsMoving					= CurCharacterSpeed > 1.0 ? true : false;			
+}
+
+void APlayerCharacterBase::ControllerBaseCoreData()
+{
+	AimRotation						= GetBaseAimRotation();
+	CurAimYaw						= AimRotation.Yaw;
+	MovementInputAmount				= CharacterMovement == nullptr ? 0.0f : CharacterMovement->GetCurrentAcceleration().Length() / CharacterMovement->GetMaxAcceleration();
+	AimYawRate						= (CurAimYaw - PreAimYaw) / DeltaT;
+	bHasMovementInput				= MovementInputAmount > 0.0f ? true : false;
+	LastMovementRotation			= CharacterMovement == nullptr ? GetActorRotation() : UKismetMathLibrary::MakeRotFromX(CharacterMovement->GetCurrentAcceleration());
 }
 
 void APlayerCharacterBase::UpdateCharacterBaseInfo()
@@ -238,22 +267,27 @@ void APlayerCharacterBase::UpdateCharacterBaseInfo()
 	CharacterBaseInfo();
 	
 
-	//Update AimYawOffset
-	FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(CurVelocity);
-	AimYawRate = UKismetMathLibrary::NormalizedDeltaRotator(MovementRotation, AimRotation).Yaw;
-	
-	FRotator DeltaRotator = UKismetMathLibrary::NormalizedDeltaRotator(PreRotator, CurRotator);
+	////Update AimYawOffset
+	//FRotator MovementRotation = UKismetMathLibrary::MakeRotFromX(CurCharacterVelocity);
+	//AimYawRate = UKismetMathLibrary::NormalizedDeltaRotator(MovementRotation, AimRotation).Yaw;
+	//
+	//FRotator DeltaRotator = UKismetMathLibrary::NormalizedDeltaRotator(PreCharacterRotator, CurCharacterRotator);
 
 }
 
-void APlayerCharacterBase::SaveCharacterBaseInfo()
+void APlayerCharacterBase::UpdateControllerBaseInfo()
 {
-	PreAcceleration = CurAcceleration;
-	PreVelocity		= CurVelocity;
-	PreLocation		= CurLocation;
-	PreRotator		= CurRotator;
-	PreSpeed		= CurSpeed;
-	PreAimYaw		= CurAimYaw;
+	ControllerBaseCoreData();
+}
+
+void APlayerCharacterBase::SaveCharacterAndControllerBaseInfo()
+{
+	PreAcceleration				= CurCharacterAcceleration;
+	PreVelocity					= CurCharacterVelocity;
+	PreLocation					= CurCharacterLocation;
+	PreCharacterRotator			= CurCharacterRotator;
+	PreSpeed					= CurCharacterSpeed;
+	PreAimYaw					= CurAimYaw;
 }
 
 void APlayerCharacterBase::SetOverlappingWeapon(APlayerWeapon* PlayerWeapon)
@@ -266,14 +300,9 @@ void APlayerCharacterBase::SetOverlappingWeapon(APlayerWeapon* PlayerWeapon)
 	}
 }
 
-bool APlayerCharacterBase::IsAimingState()
-{
-	return (Combat && Combat->bisAiming);
-}
-
 FVector APlayerCharacterBase::GetAcceleration()
 {
-	return (CurVelocity - PreVelocity) / DeltaT;
+	return (CurCharacterVelocity - PreVelocity) / DeltaT;
 }
 
 void APlayerCharacterBase::PostInitializeComponents()
@@ -319,6 +348,38 @@ void APlayerCharacterBase::OnMovementModeChanged(EMovementMode PrevMovementMode,
 
 }
 
+// Character Rotator Caculate
+
+void APlayerCharacterBase::UpdateCharacterRotator()
+{
+	
+	if (CanUpdateMovingRotation())
+	{
+		switch (RotationMode)
+		{
+		case ERotationMode::VelocityDirection:
+			SmoothRotator(LastVelocityRotation, 800.0f, 10.0f);
+			
+			break;
+		case ERotationMode::LookingDirection:
+			break;
+		case ERotationMode::Aiming:
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+void APlayerCharacterBase::SmoothRotator(FRotator TargetRotator, float TargetInterpSpeed, float ActorInterpSpeed)
+{
+	TargetRotation = UKismetMathLibrary::RInterpTo_Constant(TargetRotation, TargetRotator, DeltaT, TargetInterpSpeed);
+}
+
+bool APlayerCharacterBase::CanUpdateMovingRotation()
+{
+	return true;
+}
 
 // Character Info Interface ---Start
 // SetChracterInfo
@@ -326,10 +387,10 @@ FCharacterData APlayerCharacterBase::GetCharacterInfo()
 {
 	FCharacterData data;
 
-	data.Acceleration			 =				CurAcceleration;
-	data.Velocity				 =				CurVelocity;
+	data.Acceleration			 =				CurCharacterAcceleration;
+	data.Velocity				 =				CurCharacterVelocity;
 	data.AimingRotation			 =				AimRotation;
-	data.MovementInput			 =				GetCharacterMovement()->GetCurrentAcceleration();
+	data.MovementInput			 =				CharacterMovement->GetCurrentAcceleration();
 
 	data.bHasMovementInput		 =				bHasMovementInput;
 	data.bIsMoving				 =				bIsMoving;
@@ -337,7 +398,7 @@ FCharacterData APlayerCharacterBase::GetCharacterInfo()
 	data.bIsAiming				 =				IsAimingState();
 
 	data.AimYawRate				 =				AimYawRate;
-	data.Speed					 =				CurSpeed;
+	data.Speed					 =				CurCharacterSpeed;
 	data.MovementInputAmount	 =				MovementInputAmount;
 
 	return data;
@@ -346,8 +407,9 @@ FCharacterData APlayerCharacterBase::GetCharacterInfo()
 FCharacterState APlayerCharacterBase::GetCharacterState()
 {
 	FCharacterState state;
-	state.MovementState = this->MovementState;
+	state.MovementState = MovementState;
 	state.Stance = Stance;
+	state.RotationMode = RotationMode;
 	return state;
 }
 
@@ -374,5 +436,24 @@ void APlayerCharacterBase::SetGaitState(const EGait& state)
 
 void APlayerCharacterBase::SetOverlayState(const EOverlayState& state)
 {
-	this->OverlayState = state;
+	if (OverlayState != state)
+	{
+		OverlayState = state;
+
+	}
+}
+
+void APlayerCharacterBase::SetRotationMode(const ERotationMode& state)
+{
+	if (RotationMode != state)
+	{
+		RotationMode = state;
+		
+	}
+
+}
+
+bool APlayerCharacterBase::IsAimingState()
+{
+	return (Combat && Combat->bisAiming);
 }

@@ -33,6 +33,7 @@ public:
 	virtual void SetGaitState(const enum EGait& state) override;
 	virtual void SetStanceState(const enum EStance& state) override;
 	virtual void SetOverlayState(const enum EOverlayState& state) override;
+	virtual void SetRotationMode(const enum ERotationMode& state) override;
 
 	virtual FCharacterData GetCharacterInfo() override;
 	virtual FCharacterState GetCharacterState() override;
@@ -52,7 +53,7 @@ protected:
 	void CharacterBaseInfo();
 
 	UFUNCTION()
-	void SaveCharacterBaseInfo();
+	void SaveCharacterAndControllerBaseInfo();
 
 
 
@@ -103,6 +104,18 @@ public:
 	bool IsAimingState();
 	FVector GetAcceleration();
 
+private:
+
+	//init
+	void InitState();
+	void InitControllerData();
+	void ControllerBaseCoreData();
+	void UpdateControllerBaseInfo();
+	//Ground Rotation
+	void UpdateCharacterRotator();
+	void SmoothRotator(FRotator TargetRotator, float TargetInterpSpeed, float ActorInterpSpeed);
+	bool CanUpdateMovingRotation();
+
 
 
 private:
@@ -111,6 +124,7 @@ private:
 	EGait Gait;
 	EStance Stance;
 	EOverlayState OverlayState;
+	ERotationMode RotationMode;
 
 private:
 
@@ -118,26 +132,70 @@ private:
 	float		MovementInputAmount;
 	bool		bIsMoving;
 	bool		bHasMovementInput;
+	FRotator	TargetRotation;
 	FRotator	LastVelocityRotation;
 	FRotator	LastMovementRotation;
+	
 
 	FRotator	AimRotation;
 	float		AimYawRate;
-	float		PreAimYaw;
-	float		CurAimYaw;
 
-	float		CurSpeed;
-	FVector		CurAcceleration;
-	FVector		CurVelocity;
-	FVector		CurLocation;
-	FRotator	CurRotator;
+	float		CurAimYaw;
+	float		CurCharacterSpeed;
+	FVector		CurCharacterAcceleration;
+	FVector		CurCharacterVelocity;
+	FVector		CurCharacterLocation;
+	FRotator	CurCharacterRotator;
 
 	float		PreSpeed;
+	float		PreAimYaw;
 	FVector		PreAcceleration;
 	FVector		PreVelocity;
 	FVector		PreLocation;
-	FRotator	PreRotator;
+	FRotator	PreCharacterRotator;
 
 
-	UCharacterMovementComponent* CharacterMovement;
+	UAnimInstance*					AnimInstance;
+	UCharacterMovementComponent*	CharacterMovement;
+};
+
+USTRUCT()
+struct FCharacterCoreBaseData
+{
+	GENERATED_BODY()
+
+public:
+
+	// Rotator
+	FRotator	CharacterRotator;
+	float		AimYaw;
+
+	// Movement
+	FVector		Acceleration;
+	FVector		Velocity;
+	FVector		Location;
+	float		Speed;
+
+
+};
+
+
+USTRUCT()
+struct FControllerCoreBaseData
+{
+	GENERATED_BODY()
+
+public:
+
+	// Rotator
+	FRotator	AimRotator;
+	float		AimYaw;
+	float		AimPitch;
+
+	// Movement
+	float		ControllerMovementInput;
+	bool		bHasControllerMovementInput;
+
+
+
 };
